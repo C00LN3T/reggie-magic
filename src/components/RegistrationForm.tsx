@@ -76,8 +76,6 @@ const RegistrationForm = () => {
 
   const passwordStrength = getPasswordStrength(watchedPassword);
 
-  // Проверка дублирующего логина (будет проверяться на сервере)
-  const isLoginDuplicate = false; // Убираем клиентскую проверку
 
   const onSubmit = async (data: RegistrationFormData) => {
     setIsLoading(true);
@@ -152,15 +150,11 @@ const RegistrationForm = () => {
                   type="text"
                   placeholder="Введите логин"
                   {...register('login')}
-                  className={`${errors.login || isLoginDuplicate ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  className={`${errors.login ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                 />
-                {watchedLogin && (
+                {watchedLogin && !errors.login && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    {isLoginDuplicate ? (
-                      <XCircle className="w-5 h-5 text-destructive" />
-                    ) : (
-                      <CheckCircle className="w-5 h-5 text-success" />
-                    )}
+                    <CheckCircle className="w-5 h-5 text-success" />
                   </div>
                 )}
               </div>
@@ -168,12 +162,6 @@ const RegistrationForm = () => {
                 <p className="text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
                   {errors.login.message}
-                </p>
-              )}
-              {isLoginDuplicate && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  Пользователь с таким логином уже существует
                 </p>
               )}
             </div>
