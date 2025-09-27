@@ -1,0 +1,111 @@
+Вы абсолютно правы! В текущем коде **нет проверки на дубликат логина на фронтенде** - эта проверка должна выполняться на бэкенде. 
+
+Вот какой запрос отправляется на бэкенд и как должна работать проверка:
+
+## Отправляемый запрос:
+
+```javascript
+// Метод: POST
+// URL: http://localhost:3000/api/register (dev) или /api/register (prod)
+// Headers: { 'Content-Type': 'application/json' }
+// Body:
+{
+  "login": "username123",
+  "password": "Password123!",
+  "confirmPassword": "Password123!"
+}
+```
+
+## Как должен работать бэкенд:
+
+```javascript
+// Псевдокод для бэкенда (Node.js/Express)
+app.post('/api/register', async (req, res) => {
+  const { login, password, confirmPassword } = req.body;
+
+  try {
+    // 1. Проверка валидации (опционально - дублирует фронтенд)
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Пароли не совпадают'
+      });
+    }
+
+    // 2. ✅ ПРОВЕРКА НА ДУБЛИКАТ ЛОГИНА (ОБЯЗАТЕЛЬНО НА БЭКЕНДЕ)
+    const existingUser = await User.findOne({ where: { login } });
+    if (existingUser) {
+      return res.status(409).json({ // 409 Conflict
+        success: false,
+        error: 'Пользователь с таким логином уже существует'
+      });
+    }
+
+    // 3. Хэширование пароля и создание пользователя
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await User.create({
+      login,
+      password: hashedPassword
+    });
+
+    // 4. Успешный ответ
+    res.status(201).json({
+      success: true,
+      message: 'Пользователь успешно зарегистрирован'
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Ошибка сервера'
+    });
+  }
+});
+```
+
+## Обновленная схема работы:
+
+```
+┌─────────────────┐    POST /api/register    ┌─────────────────┐
+│   ФРОНТЕНД      │ ────────────────────────> │    БЭКЕНД       │
+│                 │    {login, password}     │                 │
+│ • Валидация     │                          │ • Проверка      │
+│   формы Zod     │ <─────────────────────── │   дубликата     │
+│ • Отправка      │    {success: true}       │ • Хэширование   │
+│   запроса       │       или                │ • Сохранение в БД│
+└─────────────────┘    {error: "Логин занят"} └─────────────────┘
+```
+
+## Рекомендации по улучшению фронтенда:
+
+Если хотите улучшить UX, можно добавить **проверку доступности логина** до отправки формы:
+
+```javascript
+// Дополнительная функция для проверки логина
+const checkLoginAvailability = async (login: string) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/check-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login })
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Использование с debounce
+useEffect(() => {
+  const timer = setTimeout(async () => {
+    if (watchedLogin && watchedLogin.length >= 3 && !errors.login) {
+      const isAvailable = await checkLoginAvailability(watchedLogin);
+      // Обновить UI - показать ✓ или ✗
+    }
+  }, 500);
+  
+  return () => clearTimeout(timer);
+}, [watchedLogin]);
+```
+
+**Важно**: Даже с такой проверкой на фронтенде, основная проверка на дубликат должна оставаться на бэкенде, так как клиентский код можно обойти.
