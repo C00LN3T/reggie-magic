@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, UserPlus, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
-// Симуляция базы данных пользователей
-const existingUsers = ['admin', 'user', 'test', 'demo'];
+// API конфигурация
+const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3000/api';
+const REGISTRATION_ENDPOINT = `${API_BASE_URL}/register`;
 
 // Схема валидации
 const registrationSchema = z.object({
@@ -75,42 +76,50 @@ const RegistrationForm = () => {
 
   const passwordStrength = getPasswordStrength(watchedPassword);
 
-  // Проверка дублирующего логина
-  const isLoginDuplicate = watchedLogin && existingUsers.includes(watchedLogin.toLowerCase());
+  // Проверка дублирующего логина (будет проверяться на сервере)
+  const isLoginDuplicate = false; // Убираем клиентскую проверку
 
   const onSubmit = async (data: RegistrationFormData) => {
     setIsLoading(true);
 
     try {
-      // Проверка дублирующего логина
-      if (existingUsers.includes(data.login.toLowerCase())) {
+      // Отправка запроса на backend
+      const response = await fetch(REGISTRATION_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          login: data.login,
+          password: data.password,
+          confirmPassword: data.confirmPassword
+        })
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok && responseData.success) {
+        // Успешная регистрация
+        toast({
+          title: 'Регистрация успешна!',
+          description: responseData.message || `Добро пожаловать, ${data.login}!`,
+          className: 'border-success text-success-foreground bg-success/10'
+        });
+        reset();
+      } else {
+        // Ошибка регистрации
         toast({
           variant: 'destructive',
           title: 'Ошибка регистрации',
-          description: 'Пользователь с таким логином уже существует'
+          description: responseData.error || responseData.message || 'Не удалось зарегистрировать пользователя'
         });
-        setIsLoading(false);
-        return;
       }
-
-      // Симуляция запроса к серверу
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Успешная регистрация
-      existingUsers.push(data.login.toLowerCase());
-      
-      toast({
-        title: 'Регистрация успешна!',
-        description: `Добро пожаловать, ${data.login}!`,
-        className: 'border-success text-success-foreground bg-success/10'
-      });
-
-      reset();
     } catch (error) {
+      console.error('Registration error:', error);
       toast({
         variant: 'destructive',
-        title: 'Ошибка',
-        description: 'Произошла ошибка при регистрации'
+        title: 'Ошибка соединения',
+        description: 'Не удалось подключиться к серверу. Проверьте соединение.'
       });
     } finally {
       setIsLoading(false);
